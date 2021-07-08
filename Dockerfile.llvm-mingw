@@ -1,0 +1,26 @@
+# Compiler image
+# -------------------------------------------------------------------------------------------------
+FROM mstorsjo/llvm-mingw as compiler
+
+# stable fix 1.0.18 bug __mencpy_chk err
+RUN git clone -b stable https://github.com/jedisct1/libsodium.git --depth 1 \
+  && cd libsodium \
+  && ./autogen.sh -s \
+  && ./configure --prefix=${TOOLCHAIN_PREFIX} --host=x86_64-w64-mingw32 \
+  && make clean \
+  && make -j$(nproc) \
+  && make install
+
+COPY . .
+
+RUN git submodule update --init
+RUN /bin/sh ./make_llvm_mingw.sh \
+  && strip build/*.exe
+
+# Runtime image
+# -------------------------------------------------------------------------------------------------
+FROM alpine:3.13.5 AS runtime
+
+WORKDIR /root
+
+COPY --from=compiler /build/build/*.exe /root/

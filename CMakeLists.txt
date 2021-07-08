@@ -14,6 +14,19 @@ project(chia-plotter C CXX ASM)
 set(TARGET_ARCH ${CMAKE_HOST_SYSTEM_PROCESSOR})
 message(STATUS "Architecture: ${TARGET_ARCH}")
 
+if (WIN32)
+
+    add_definitions(-DSODIUM_STATIC=1)
+    add_definitions(-Dsodium_USE_STATIC_LIBS=1)
+    add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+
+    set(sodium_DIR "${PREFIXPATH}")
+    set(sodium_INCLUDE_DIR "${PREFIXPATH}/include")
+    set(sodium_LIBRARY_DEBUG "${PREFIXPATH}/lib/libsodium.a")
+    set(sodium_LIBRARY_RELEASE "${PREFIXPATH}/lib/libsodium.a")
+
+endif()
+
 set(ENV{RELIC_MAIN} "1")
 add_subdirectory(lib/bls-signatures)
 
@@ -42,6 +55,12 @@ set(BLAKE3_SRC
     ${BLAKE3_PATH}/blake3.c
     ${BLAKE3_PATH}/blake3_portable.c
     ${BLAKE3_PATH}/blake3_dispatch.c
+#    ${BLAKE3_PATH}/blake3_sse2.c
+#    ${BLAKE3_PATH}/blake3_sse41.c
+#    ${BLAKE3_PATH}/blake3_avx2.c
+#    ${BLAKE3_PATH}/blake3_avx512.c
+    ${BLAKE3_PATH}/blake3_avx2_x86-64_windows_gnu.S
+    ${BLAKE3_PATH}/blake3_avx512_x86-64_windows_gnu.S
     ${BLAKE3_PATH}/blake3_sse41_x86-64_windows_gnu.S
     ${BLAKE3_PATH}/blake3_sse2_x86-64_windows_gnu.S
 )
@@ -81,6 +100,10 @@ add_library(chia_plotter STATIC
 
 target_link_libraries(chia_plotter blake3 fse Threads::Threads)
 
+if (WIN32)
+    add_library(uint128 STATIC uint128_t/uint128_t.cpp)
+	target_include_directories(uint128 PUBLIC uint128_t)
+else()
 add_executable(test_copy test/test_copy.cpp)
 add_executable(test_disk_sort test/test_disk_sort.cpp)
 
@@ -91,8 +114,13 @@ add_executable(test_phase_4 test/test_phase_4.cpp)
 
 add_executable(check_phase_1 test/check_phase_1.cpp)
 
+endif()
+
 add_executable(chia_plot src/chia_plot.cpp)
 
+if (WIN32)
+    target_link_libraries(chia_plot -static chia_plotter bls uint128)
+else()
 target_link_libraries(test_copy chia_plotter)
 target_link_libraries(test_disk_sort chia_plotter)
 
@@ -104,3 +132,4 @@ target_link_libraries(test_phase_4 chia_plotter)
 target_link_libraries(check_phase_1 chia_plotter)
 
 target_link_libraries(chia_plot chia_plotter bls sodium)
+endif()
